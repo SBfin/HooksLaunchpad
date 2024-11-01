@@ -64,3 +64,11 @@ $ forge --help
 $ anvil --help
 $ cast --help
 ```
+
+
+### A pump fun based on Unihooks
+
+- Launch tokens
+- Tokens trade on a bonding curve till a market cap of 50'000
+- After that, a Uni pool is created
+- Users can: launch tokens, sell tokens and hold tokens
