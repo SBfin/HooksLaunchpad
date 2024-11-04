@@ -24,6 +24,9 @@ contract TestBondingCurveToken is Test, Deployers {
     BondingCurveToken public bondingCurveToken;
     uint256 public constant PRECISION = 1e18;
 
+
+    event PoolInitialized(address poolManager, address currency0, address currency1, uint160 sqrtPriceX96);
+
     function setUp() public {
         vm.startBroadcast(DEVELOPER);
         console.log("Deploying FreshManagers and Routers");
@@ -31,7 +34,7 @@ contract TestBondingCurveToken is Test, Deployers {
 
         console.log("Deploying BondingCurveToken");
         bondingCurveToken = new BondingCurveToken(address(manager), address(modifyLiquidityRouter));
-        vm.deal(address(this), 1e6 ether);
+        vm.deal(address(this), 1e12 ether);
         vm.stopBroadcast();
     }
 
@@ -39,13 +42,14 @@ contract TestBondingCurveToken is Test, Deployers {
         uint256 initialEthBalance = address(this).balance;
         console.log("Initial ETH balance: %d", initialEthBalance);
         uint256 initialBalance = bondingCurveToken.balanceOf(address(this));
-        uint256 price = bondingCurveToken.getPrice();
         uint256 amountToBuy = 100 ether;
+        uint256 price = bondingCurveToken.getBuyQuote(amountToBuy);
         uint256 ethAmount = (price * amountToBuy) / PRECISION;
         console.log("ethAmount: %d", ethAmount);
 
         // Calculate price and send enough ETH to buy tokens
-        address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
+        (bool success, ) = address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
+        require(success, "Buy transaction failed");
 
         uint256 newBalance = bondingCurveToken.balanceOf(address(this));
         assertEq(newBalance, initialBalance + amountToBuy, "User's balance should increase after buying");
@@ -60,19 +64,20 @@ contract TestBondingCurveToken is Test, Deployers {
         uint256 amountToSell = 50 ether;
 
         // First, buy some tokens to sell
-        uint256 price = bondingCurveToken.getPrice();
         uint256 amountToBuy = 100 ether;
+        uint256 price = bondingCurveToken.getBuyQuote(amountToBuy);
         uint256 ethAmount = (price * amountToBuy) / PRECISION;
 
         // Calculate price and send enough ETH to buy tokens
-        address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
+        (bool success, ) = address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
+        require(success, "Buy transaction failed");
 
-        uint256 initialBalance = address(this).balance; // Get initial Ether balance
+        // uint256 initialBalance = address(this).balance; // Get initial Ether balance
         uint256 initialTokenBalance = bondingCurveToken.balanceOf(address(this)); // Get initial token balance
 
         bondingCurveToken.sell(amountToSell);
 
-        uint256 newBalance = address(this).balance;
+        // uint256 newBalance = address(this).balance;
         uint256 newTokenBalance = bondingCurveToken.balanceOf(address(this));
 
         //assertEq(newBalance, initialBalance + (bondingCurveToken.getPrice() * amountToSell) / PRECISION, "User's Ether balance should increase after selling");
@@ -80,4 +85,51 @@ contract TestBondingCurveToken is Test, Deployers {
             newTokenBalance, initialTokenBalance - amountToSell, "User's token balance should decrease after selling"
         );
     }
+
+    function testExpectRevertInvalidAmount() public {
+        uint256 amountToBuy = 100 ether;
+        uint256 price = bondingCurveToken.getBuyQuote(amountToBuy);
+        uint256 ethAmount = (price * amountToBuy) / PRECISION;
+
+        // Calculate price and send enough ETH to buy tokens
+        vm.expectRevert(BondingCurveToken.InvalidAmountError.selector);
+        bondingCurveToken.buy{value: ethAmount - 1}(amountToBuy);
+    }
+
+    function testExpectRevertNotEnoughETHtoSellTokens() public{
+
+        // First, buy some tokens to sell
+        uint256 amountToBuy = 100 ether;
+        uint256 price = bondingCurveToken.getBuyQuote(amountToBuy);
+        uint256 ethAmount = (price * amountToBuy) / PRECISION;
+
+        // Calculate price and send enough ETH to buy tokens
+        (bool success, ) = address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
+        require(success, "Buy transaction failed");
+
+        vm.expectRevert(BondingCurveToken.NotEnoughETHtoSellTokens.selector);
+        bondingCurveToken.sell(amountToBuy + 50 ether);
+    }
+
+    /*
+    function testCreateUniswapPool() public {
+        uint256 initialEthBalance = address(this).balance;
+        console.log("Initial ETH balance: %d", initialEthBalance);
+
+        // Buy enough tokens to trigger the creation of the Uniswap pool
+        uint256 price = bondingCurveToken.getPrice();
+        uint256 amountToBuy = bondingCurveToken.TOTAL_SUPPLY() - bondingCurveToken.totalSupply() + 1 ether;
+        uint256 ethAmount = (price * amountToBuy) / PRECISION;
+
+        console.log("ETH needed to buy enough tokens for pool creation: %d", ethAmount);
+
+        // Send enough ETH to buy the remaining tokens
+        // Set up expectations for PoolInitialized event
+        vm.expectEmit(true, true, true, true); // Setting all fields to true for full match
+        emit PoolInitialized(address(manager), address(0), address(bondingCurveToken), uint160(price)); // Expected event parameters
+
+        (bool success, ) = address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
+        require(success, "Buy transaction failed");
+            
+    }*/
 }

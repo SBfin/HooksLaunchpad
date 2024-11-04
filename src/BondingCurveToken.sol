@@ -31,11 +31,11 @@ contract BondingCurveToken is ERC20Capped, IERC721Receiver {
     using CurrencyLibrary for Currency;
 
     // Bonding curve params
-    uint256 public constant TOTAL_SUPPLY = 10000 * 1e18;
-    uint256 public constant DEV_SUPPLY = 2000 * 1e18;
-    uint256 public constant INITIAL_PRICE = 1 * 1e18;
-    uint256 public constant PRICE_SLOPE = 1 * 1e18;
-    uint256 public constant PRECISION = 1e18;
+    uint256 public constant TOTAL_SUPPLY = 10000 ether;
+    uint256 public constant OWN_SUPPLY = 2000 ether;
+    uint256 public constant INITIAL_PRICE = 2e15;
+    uint256 public constant PRICE_SLOPE = 24e10;
+    uint256 public constant PRECISION = 1 ether;
 
     // Mapping to keep track of NFTs owned by this contract
     mapping(address => uint256[]) public ownedNFTs;
@@ -47,6 +47,8 @@ contract BondingCurveToken is ERC20Capped, IERC721Receiver {
 
     // Event to log received NFTs
     event NFTReceived(address operator, address from, uint256 tokenId, bytes data);
+    event PoolInitialized(address poolManager, address currency0, address currency1, uint160 sqrtPriceX96);
+    event LiquidityAddedToPool(address positionManager);
 
     // Errors
     error InvalidAmountError();
@@ -56,13 +58,13 @@ contract BondingCurveToken is ERC20Capped, IERC721Receiver {
         ERC20Capped(TOTAL_SUPPLY)
         ERC20("Bonding Curve Token", "BCT")
     {
-        _mint(msg.sender, DEV_SUPPLY);
+        _mint(address(this), OWN_SUPPLY);
         posm = IPositionManager(posmAddress);
         poolm = IPoolManager(poolmAddress);
     }
 
     function buy(uint256 amount) public payable {
-        uint256 price = getPrice();
+        uint256 price = getBuyQuote(amount);
         console.log("Price: %d", price);
         console.log("Amount: %d", amount);
         console.log("Value: %d", msg.value);
@@ -76,18 +78,25 @@ contract BondingCurveToken is ERC20Capped, IERC721Receiver {
         // if amount exceeds total supply, then mint the remaining amount
         if (totalSupply() + amount > TOTAL_SUPPLY) {
             amount = TOTAL_SUPPLY - totalSupply();
-            createUniswapPoolAndAddLiquidity();
+            payable(msg.sender).transfer(msg.value - (price * amount) / PRECISION);
+            _mint(msg.sender, amount);
+            PoolKey memory pool = _createUniswapPool();
+            console.log("Deploying the pool...");
+            //_addLiquidity(pool);
+        } else {
+            console.log("amount: %d", amount);
+            payable(msg.sender).transfer(msg.value - (price * amount) / PRECISION);
+            console.log("Minting %d tokens", amount);
+            _mint(msg.sender, amount);
         }
-
-        console.log("amount: %d", amount);
-        payable(msg.sender).transfer(msg.value - (price * amount) / PRECISION);
-        console.log("Minting %d tokens", amount);
-        _mint(msg.sender, amount);
     }
 
     function sell(uint256 amount) public {
-        uint256 price = getPrice();
+        console.log("Get sell price...");
+        uint256 price = getSellQuote(amount);
+        console.log("Sell price: %d", price);
         uint256 value = (price * amount) / PRECISION;
+        console.log("Sell value: %d", value);
 
         if (value > address(this).balance) {
             revert NotEnoughETHtoSellTokens();
@@ -101,11 +110,21 @@ contract BondingCurveToken is ERC20Capped, IERC721Receiver {
         return INITIAL_PRICE + (totalSupply() * PRICE_SLOPE) / PRECISION;
     }
 
+    function getBuyQuote(uint256 amount) public view returns (uint256) {
+        // Average between the current price and the price after the amount is minted
+        return (getPrice() + getPrice() + (PRICE_SLOPE * amount) / PRECISION) / 2;
+    }
+
+    function getSellQuote(uint256 amount) public view returns (uint256) {
+        // Average between the current price and the price after the amount is minted
+        return (getPrice() + (getPrice() - (PRICE_SLOPE * amount) / PRECISION)) / 2;
+    }
+
     function getMarketCap() public view returns (uint256) {
         return totalSupply() * getPrice();
     }
 
-    function createUniswapPoolAndAddLiquidity() internal {
+    function _createUniswapPool() internal returns (PoolKey memory) {
         // Currently, we are not using hooks
         PoolKey memory pool = PoolKey({
             currency0: CurrencyLibrary.ADDRESS_ZERO,
@@ -116,7 +135,14 @@ contract BondingCurveToken is ERC20Capped, IERC721Receiver {
         });
 
         // Deploy pool from poolManager
-        IPoolManager(poolm).initialize(pool, uint16(getPrice()));
+        IPoolManager(poolm).initialize(pool, uint160(getPrice()));
+
+        emit PoolInitialized(address(poolm), address(Currency.unwrap(CurrencyLibrary.ADDRESS_ZERO)), address(this), uint160(getPrice()));
+        
+        return pool;
+    }
+
+    function _addLiquidity(PoolKey memory pool) internal {
 
         // We want to create a new liquidity positions, actions is needed when calling the poolm
         bytes memory actions = abi.encodePacked(Actions.MINT_POSITION, Actions.SETTLE_PAIR);
@@ -130,7 +156,7 @@ contract BondingCurveToken is ERC20Capped, IERC721Receiver {
             TickMath.getSqrtPriceAtTick(TickMath.MIN_TICK),
             TickMath.getSqrtPriceAtTick(TickMath.MAX_TICK),
             address(this).balance,
-            totalSupply()
+            totalSupply() // TO DO: this should be precisely equal to what we have minted
         );
 
         // TODO: implement hooks in this contract
@@ -156,6 +182,10 @@ contract BondingCurveToken is ERC20Capped, IERC721Receiver {
         tokenApprovals();
 
         posm.modifyLiquidities(abi.encode(actions, params), deadline);
+
+        // TO Do: better way to emit this event
+        emit LiquidityAddedToPool(address(posm));
+        
     }
 
     function tokenApprovals() internal {
