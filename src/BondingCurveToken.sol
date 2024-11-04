@@ -110,6 +110,10 @@ contract BondingCurveToken is ERC20Capped, IERC721Receiver {
         return INITIAL_PRICE + (totalSupply() * PRICE_SLOPE) / PRECISION;
     }
 
+    function getPriceAtSupply(uint256 supply) public view returns (uint256) {
+        return INITIAL_PRICE + (supply * PRICE_SLOPE) / PRECISION;
+    }
+
     function getBuyQuote(uint256 amount) public view returns (uint256) {
         // Average between the current price and the price after the amount is minted
         return (getPrice() + getPrice() + (PRICE_SLOPE * amount) / PRECISION) / 2;
@@ -125,6 +129,10 @@ contract BondingCurveToken is ERC20Capped, IERC721Receiver {
     }
 
     function _createUniswapPool() internal returns (PoolKey memory) {
+
+        // PriceQ
+        uint160 pricePoolQ = uint160(getPrice() * (2^96));
+        
         // Currently, we are not using hooks
         PoolKey memory pool = PoolKey({
             currency0: CurrencyLibrary.ADDRESS_ZERO,
@@ -135,9 +143,9 @@ contract BondingCurveToken is ERC20Capped, IERC721Receiver {
         });
 
         // Deploy pool from poolManager
-        IPoolManager(poolm).initialize(pool, uint160(getPrice()));
+        IPoolManager(poolm).initialize(pool, pricePoolQ);
 
-        emit PoolInitialized(address(poolm), address(Currency.unwrap(CurrencyLibrary.ADDRESS_ZERO)), address(this), uint160(getPrice()));
+        emit PoolInitialized(address(poolm), address(Currency.unwrap(CurrencyLibrary.ADDRESS_ZERO)), address(this), pricePoolQ);
         
         return pool;
     }
