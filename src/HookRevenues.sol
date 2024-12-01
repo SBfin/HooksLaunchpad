@@ -11,7 +11,7 @@ import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {console} from "forge-std/console.sol";
 contract HookRevenues is BaseHook {
     // Hook to collect fees from the pool
-    uint256 public constant HOOK_FEE = 100; // 1% fee (assuming WAD scale)
+    uint256 public constant HOOK_FEE = 1e16; // 1% fee (assuming WAD scale)
 
     constructor(IPoolManager _poolManager) BaseHook(_poolManager) {}
 
@@ -54,9 +54,14 @@ contract HookRevenues is BaseHook {
         uint256 feeAmount = mulWadDown(uint256(int256(amountUnspecified)), HOOK_FEE);
 
         console.log("minting fee amount", feeAmount);
-        // mint ERC20 or transfer ETH to this contract
-        poolManager.mint(address(this), CurrencyLibrary.toId(currencyUnspecified), feeAmount);
+        // send ERC20 or transfer ETH to this contract
 
+
+        //poolManager.mint(address(this), CurrencyLibrary.toId(currencyUnspecified), feeAmount);
+        // Take either ETH or ERC20 tokens from the pool manager
+        console.log("hook take");
+        poolManager.take(currencyUnspecified,address(this), feeAmount);
+        
         return (BaseHook.afterSwap.selector, int128(int256(feeAmount)));
     }
 

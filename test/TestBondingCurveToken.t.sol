@@ -27,6 +27,7 @@ import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 // - Router contract for the swaps
 // - A developer (user) that deploy the contract and get the initial supply
 // - A user that buys or sells the tokens
+// TODO test with the fees, doing another swap
 
 contract TestBondingCurveToken is Test, Deployers {
     address public DEVELOPER = 0x1B7E1b7EA98232c77f9eFc75c4a7C7ea2c4D79F1;
@@ -73,7 +74,10 @@ contract TestBondingCurveToken is Test, Deployers {
         uint256 price = bondingCurveToken.getBuyQuote(amountToBuy);
         uint256 ethAmount = (price * amountToBuy) / PRECISION;
 
-        address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
+        (bool success, ) = address(bondingCurveToken).call{value: ethAmount}(
+            abi.encodeWithSignature("buy(uint256)", amountToBuy)
+        );
+        require(success, "Buy transaction failed in poolCreated");
         _;
     }
 
@@ -170,7 +174,11 @@ contract TestBondingCurveToken is Test, Deployers {
         // uint160(bondingCurveToken.getPriceAtSupply(bondingCurveToken.TOTAL_SUPPLY()) * (2 ^ 96));
         // emit PoolInitialized(address(manager), address(0), address(bondingCurveToken), uint160(initialPriceCurve)); // Expected event parameters
 
-        address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
+        (bool success, ) = address(bondingCurveToken).call{value: ethAmount}(
+            abi.encodeWithSignature("buy(uint256)", amountToBuy)
+        );
+        require(success, "Buy transaction failed in createUniswapPool");
+
         // Check that the supply is exactly the total supply
         assertEq(
             bondingCurveToken.totalSupply(),
@@ -219,6 +227,6 @@ contract TestBondingCurveToken is Test, Deployers {
         uint256 hookEthBalanceAfter = address(hook).balance;
 
         // assertGt(hookTokenBalanceAfter, hookTokenBalanceBefore, "Hook should have collected fees");
-        assertGt(hookEthBalanceAfter, hookEthBalanceBefore, "Hook should have collected fees");
+        assertGt(hookTokenBalanceAfter, hookTokenBalanceBefore, "Hook should have collected fees");
     }
 }
