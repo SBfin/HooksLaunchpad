@@ -194,7 +194,7 @@ contract BondingCurveToken is ERC20Capped, IERC721Receiver {
 
         _tokenApprovals();
 
-        posm.modifyLiquidity(
+        posm.modifyLiquidity{value: address(this).balance}(
             pool,
             IPoolManager.ModifyLiquidityParams(
                 TickMath.minUsableTick(TICK_SPACING), TickMath.maxUsableTick(TICK_SPACING), int256(uint256(liquidityDelta)), 0
@@ -203,130 +203,11 @@ contract BondingCurveToken is ERC20Capped, IERC721Receiver {
         );
         
     }
-    /*
-    function _addLiquidity(PoolKey memory pool) internal {
-        uint256 ethBalance = address(this).balance;
-        uint256 tokenBalance = this.balanceOf(address(this));
-        
-        uint160 pricePoolQ = uint160(FixedPointMathLib.sqrt(getPriceInv() * (2**96)));
-        uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
-            pricePoolQ,
-            TickMath.getSqrtPriceAtTick(TickMath.MIN_TICK),
-            TickMath.getSqrtPriceAtTick(TickMath.MAX_TICK),
-            ethBalance,
-            tokenBalance
-        );
 
-        (uint256 amount0Check, uint256 amount1Check) = LiquidityAmounts.getAmountsForLiquidity(
-            pricePoolQ,
-            TickMath.getSqrtPriceAtTick(TickMath.MIN_TICK),
-            TickMath.getSqrtPriceAtTick(TickMath.MAX_TICK),
-            liquidity
-        );
+    // add a fallback function to handle ETH
+    receive() external payable {}
 
-        uint256 amount0Max = (ethBalance * 98) / 100;  // Slightly higher to account for slippage
-        uint256 amount1Max = (tokenBalance * 98) / 100; // Slightly higher to account for slippage
-
-        console.log("amount0Check: %d", amount0Check);
-        console.log("amount1Check: %d", amount1Check);
-
-        console.log("amount0Max: %d", amount0Max);
-        console.log("amount1Max: %d", amount1Max);
-
-        bytes memory hookData = new bytes(0);
-        bytes memory actions = abi.encodePacked(Actions.MINT_POSITION, Actions.SETTLE_PAIR);
-        bytes[] memory params = new bytes[](2);
-
-        params[0] = abi.encode(
-            pool,
-            TickMath.MIN_TICK + 60,
-            TickMath.MAX_TICK - 3000,
-            liquidity,
-            amount0Max,
-            amount1Max,
-            address(this),
-            hookData
-        );
-
-        params[1] = abi.encode(CurrencyLibrary.ADDRESS_ZERO, Currency.wrap(address(this)));
-
-        _tokenApprovals();
-
-        uint256 deadline = block.timestamp + 60;
-
-        posm.modifyLiquidities{value: ethBalance}(
-            abi.encode(actions, params),
-            deadline
-        );
-
-        emit LiquidityAddedToPool(address(posm));
-    }*/
-
-    /*
-
-    function _addLiquidity(PoolKey memory pool) internal {
-        // Print ETH balance and token balance
-        console.log("ETH balance: %d", address(this).balance);
-        console.log("Token balance: %d", this.balanceOf(address(this)) );
-        console.log("Price: %d", getPriceInv());
-
-        uint160 pricePoolQ = uint160(FixedPointMathLib.sqrt(getPriceInv() * (2 ** 96)));
-        console.log("Pool price SQRTX96: %d", pricePoolQ);
-        
-        uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
-            pricePoolQ,
-            TickMath.getSqrtPriceAtTick(TickMath.MIN_TICK),
-            TickMath.getSqrtPriceAtTick(TickMath.MAX_TICK),
-            address(this).balance - 1 wei,
-            this.balanceOf(address(this)) - 1 wei// TO DO: this should be precisely equal to what we have minted
-        );
-
-        (uint256 amount0Check, uint256 amount1Check) = LiquidityAmounts.getAmountsForLiquidity(
-            pricePoolQ,
-            TickMath.getSqrtPriceAtTick(TickMath.MIN_TICK),
-            TickMath.getSqrtPriceAtTick(TickMath.MAX_TICK),
-            liquidity
-        );
-
-        console.log("Liquidity: %d", liquidity);
-        console.log("Amount0Check: %d", amount0Check);
-        console.log("Amount1Check: %d", amount1Check);
-
-         // slippage limits
-        uint256 amount0Max = address(this).balance - 1 wei;
-        uint256 amount1Max = this.balanceOf(address(this)) - 1 wei;
-
-        bytes memory hookData = new bytes(0);
-
-        bytes memory actions = abi.encodePacked(Actions.MINT_POSITION, Actions.SETTLE_PAIR);
-        
-        bytes[] memory params = new bytes[](2);
-        
-        params[0] = abi.encode(pool, 
-                                TickMath.MIN_TICK+1, 
-                                TickMath.MAX_TICK-1, 
-                                liquidity, 
-                                amount0Max, 
-                                amount1Max, 
-                                address(this), 
-                                hookData);
-
-        params[1] = abi.encode(CurrencyLibrary.ADDRESS_ZERO, Currency.wrap(address(this)));
-
-        _tokenApprovals();
-        
-        uint256 deadline = block.timestamp + 60;
-
-        posm.modifyLiquidities{value: amount0Max}(
-            abi.encode(actions, params),
-            deadline
-        );
-        
-        // TO Do: better way to emit this event
-        emit LiquidityAddedToPool(address(posm));
-
-    }*/
-
+   
     function _tokenApprovals() internal {
         // Currency0 is alaways ETH
         // if (!currency0.isAddressZero()) {
