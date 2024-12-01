@@ -24,7 +24,6 @@ contract TestBondingCurveToken is Test, Deployers {
     BondingCurveToken public bondingCurveToken;
     uint256 public constant PRECISION = 1e18;
 
-
     event PoolInitialized(address poolManager, address currency0, address currency1, uint160 sqrtPriceX96);
 
     function setUp() public {
@@ -38,6 +37,7 @@ contract TestBondingCurveToken is Test, Deployers {
         vm.stopBroadcast();
     }
 
+
     function testBuy() public {
         uint256 initialEthBalance = address(this).balance;
         console.log("Initial ETH balance: %d", initialEthBalance);
@@ -48,7 +48,8 @@ contract TestBondingCurveToken is Test, Deployers {
         console.log("ethAmount: %d", ethAmount);
 
         // Calculate price and send enough ETH to buy tokens
-        (bool success, ) = address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
+        (bool success,) =
+            address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
         require(success, "Buy transaction failed");
 
         uint256 newBalance = bondingCurveToken.balanceOf(address(this));
@@ -69,7 +70,8 @@ contract TestBondingCurveToken is Test, Deployers {
         uint256 ethAmount = (price * amountToBuy) / PRECISION;
 
         // Calculate price and send enough ETH to buy tokens
-        (bool success, ) = address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
+        (bool success,) =
+            address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
         require(success, "Buy transaction failed");
 
         // uint256 initialBalance = address(this).balance; // Get initial Ether balance
@@ -96,22 +98,21 @@ contract TestBondingCurveToken is Test, Deployers {
         bondingCurveToken.buy{value: ethAmount - 1}(amountToBuy);
     }
 
-    function testExpectRevertNotEnoughETHtoSellTokens() public{
-
+    function testExpectRevertNotEnoughETHtoSellTokens() public {
         // First, buy some tokens to sell
         uint256 amountToBuy = 100 ether;
         uint256 price = bondingCurveToken.getBuyQuote(amountToBuy);
         uint256 ethAmount = (price * amountToBuy) / PRECISION;
 
         // Calculate price and send enough ETH to buy tokens
-        (bool success, ) = address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
+        (bool success,) =
+            address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
         require(success, "Buy transaction failed");
 
         vm.expectRevert(BondingCurveToken.NotEnoughETHtoSellTokens.selector);
         bondingCurveToken.sell(amountToBuy + 50 ether);
     }
 
-    
     function testCreateUniswapPool() public {
         uint256 initialEthBalance = address(this).balance;
         console.log("Initial ETH balance: %d", initialEthBalance);
@@ -126,11 +127,16 @@ contract TestBondingCurveToken is Test, Deployers {
         // Send enough ETH to buy the remaining tokens
         // Set up expectations for PoolInitialized event
         vm.expectEmit(true, true, true, true); // Setting all fields to true for full match
-        uint160 initialPriceCurve = uint160(bondingCurveToken.getPriceAtSupply(bondingCurveToken.TOTAL_SUPPLY()) * (2^96));
+        uint160 initialPriceCurve =
+            uint160(bondingCurveToken.getPriceAtSupply(bondingCurveToken.TOTAL_SUPPLY()) * (2 ^ 96));
         emit PoolInitialized(address(manager), address(0), address(bondingCurveToken), uint160(initialPriceCurve)); // Expected event parameters
 
         address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
-        // require(success, "Buy transaction failed");
-            
+        // Check that the supply is exactly the total supply
+        assertEq(
+            bondingCurveToken.totalSupply(),
+            bondingCurveToken.TOTAL_SUPPLY(),
+            "Total supply should be equal to TOTAL_SUPPLY"
+        );
     }
 }
