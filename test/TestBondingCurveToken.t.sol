@@ -53,7 +53,7 @@ contract TestBondingCurveToken is Test, Deployers {
 
         // Deploy bonding curve token
         console.log("Deploying BondingCurveToken");
-        bondingCurveToken = new BondingCurveToken(address(manager), address(modifyLiquidityRouter), address(hook));
+        bondingCurveToken = new BondingCurveToken(address(manager), address(modifyLiquidityRouter), address(hook), "MyToken", "MTK");
 
         vm.deal(address(this), 1e12 ether);
 
@@ -74,9 +74,8 @@ contract TestBondingCurveToken is Test, Deployers {
         uint256 price = bondingCurveToken.getBuyQuote(amountToBuy);
         uint256 ethAmount = (price * amountToBuy) / PRECISION;
 
-        (bool success, ) = address(bondingCurveToken).call{value: ethAmount}(
-            abi.encodeWithSignature("buy(uint256)", amountToBuy)
-        );
+        (bool success,) =
+            address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
         require(success, "Buy transaction failed in poolCreated");
         _;
     }
@@ -174,9 +173,8 @@ contract TestBondingCurveToken is Test, Deployers {
         // uint160(bondingCurveToken.getPriceAtSupply(bondingCurveToken.TOTAL_SUPPLY()) * (2 ^ 96));
         // emit PoolInitialized(address(manager), address(0), address(bondingCurveToken), uint160(initialPriceCurve)); // Expected event parameters
 
-        (bool success, ) = address(bondingCurveToken).call{value: ethAmount}(
-            abi.encodeWithSignature("buy(uint256)", amountToBuy)
-        );
+        (bool success,) =
+            address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
         require(success, "Buy transaction failed in createUniswapPool");
 
         // Check that the supply is exactly the total supply

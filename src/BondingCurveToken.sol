@@ -66,9 +66,9 @@ contract BondingCurveToken is ERC20Capped {
     error NotEnoughETHtoSellTokens();
     error NotEnoughETHtoProvideLiquidity();
 
-    constructor(address poolmAddress, address posmAddress, address hookAddress)
+    constructor(address poolmAddress, address posmAddress, address hookAddress, string memory name, string memory symbol)
         ERC20Capped(TOTAL_SUPPLY)
-        ERC20("Bonding Curve Token", "BCT")
+        ERC20(name, symbol)
     {
         _mint(address(this), OWN_SUPPLY);
         // posm = IPositionManager(posmAddress);
