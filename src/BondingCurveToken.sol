@@ -21,8 +21,7 @@ import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Recei
 import {console} from "forge-std/console.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {LiquidityOperations} from "@uniswap/v4-periphery/test/shared/LiquidityOperations.sol";
-import {BaseHook} from "v4-periphery/src/base/hooks/BaseHook.sol";
-
+import {HookRevenues} from "./HookRevenues.sol";
 // BondingCurveToken contract
 // The base for launching memecoins
 // User can buy and sell tokens using a bonding curve
@@ -30,9 +29,11 @@ import {BaseHook} from "v4-periphery/src/base/hooks/BaseHook.sol";
 // The contract holds liquidity in the pool (V2 style)
 // TO DO: Add trading fees to the bonding curve
 // TO DO: Fee management for the pool
-// TO DO: Change shape of the bonding curve
+// TO DO: Add a modifier so users can't buy and sell tokens after the pool is created
+// TO DO: Create Hook
+// TO DO: Create Hook data
 
-contract BondingCurveToken is ERC20Capped, IERC721Receiver {
+contract BondingCurveToken is ERC20Capped {
     using CurrencyLibrary for Currency;
     using StateLibrary for IPoolManager;
     using FixedPointMathLib for uint160;
@@ -115,22 +116,6 @@ contract BondingCurveToken is ERC20Capped, IERC721Receiver {
 
         _burn(msg.sender, amount);
         payable(msg.sender).transfer(value);
-    }
-
-    // Implement onERC721Received so the contract can receive ERC721 tokens
-    function onERC721Received(address operator, address from, uint256 tokenId, bytes memory data)
-        public
-        override
-        returns (bytes4)
-    {
-        // Store the NFT in the ownedNFTs mapping
-        ownedNFTs[msg.sender].push(tokenId);
-
-        // Emit an event for tracking purposes
-        emit NFTReceived(operator, from, tokenId, data);
-
-        // Return the selector to confirm the NFT was received
-        return this.onERC721Received.selector;
     }
 
     //////////////////////////

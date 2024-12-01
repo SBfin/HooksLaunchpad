@@ -12,6 +12,9 @@ import {PoolManager} from "@uniswap/v4-core/src/PoolManager.sol";
 // Our contracts
 import {BondingCurveToken} from "../src/BondingCurveToken.sol";
 import {console} from "forge-std/console.sol";
+import {HookRevenues} from "../src/HookRevenues.sol";   
+
+import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 
 // Needed for the deployment and testing:
 // - PoolManager to create the pool
@@ -19,10 +22,12 @@ import {console} from "forge-std/console.sol";
 // - Router contract for the swaps
 // - A developer (user) that deploy the contract and get the initial supply
 // - A user that buys or sells the tokens
+
 contract TestBondingCurveToken is Test, Deployers {
     address public DEVELOPER = 0x1B7E1b7EA98232c77f9eFc75c4a7C7ea2c4D79F1;
     BondingCurveToken public bondingCurveToken;
     uint256 public constant PRECISION = 1e18;
+    HookRevenues public hook;
 
     event PoolInitialized(address poolManager, address currency0, address currency1, uint160 sqrtPriceX96);
 
@@ -31,9 +36,24 @@ contract TestBondingCurveToken is Test, Deployers {
         console.log("Deploying FreshManagers and Routers");
         deployFreshManagerAndRouters();
 
+        // Deploy the hook using a foundry cheatcode
+        // the hook address must have correct flags
+        address flags = address(
+            uint160(
+                Hooks.AFTER_SWAP_FLAG | Hooks.AFTER_SWAP_RETURNS_DELTA_FLAG 
+            ) ^ (0x4444 << 144) // Namespace the hook to avoid collisions
+        );
+        deployCodeTo("HookRevenues.sol:HookRevenues", abi.encode(manager), flags);
+        hook = HookRevenues(flags);
+
+        // Deploy bonding curve token
         console.log("Deploying BondingCurveToken");
         bondingCurveToken = new BondingCurveToken(address(manager), address(modifyLiquidityRouter));
+
         vm.deal(address(this), 1e12 ether);
+
+        // deploy hook
+
         vm.stopBroadcast();
     }
 
@@ -127,8 +147,8 @@ contract TestBondingCurveToken is Test, Deployers {
         // Send enough ETH to buy the remaining tokens
         // Set up expectations for PoolInitialized event
         // vm.expectEmit(true, true, true, true); // Setting all fields to true for full match
-        uint160 initialPriceCurve =
-            uint160(bondingCurveToken.getPriceAtSupply(bondingCurveToken.TOTAL_SUPPLY()) * (2 ^ 96));
+        // uint160 initialPriceCurve =
+            // uint160(bondingCurveToken.getPriceAtSupply(bondingCurveToken.TOTAL_SUPPLY()) * (2 ^ 96));
         // emit PoolInitialized(address(manager), address(0), address(bondingCurveToken), uint160(initialPriceCurve)); // Expected event parameters
 
         address(bondingCurveToken).call{value: ethAmount}(abi.encodeWithSignature("buy(uint256)", amountToBuy));
