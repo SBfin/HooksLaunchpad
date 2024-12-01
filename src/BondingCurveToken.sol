@@ -5,11 +5,9 @@ pragma solidity ^0.8.26;
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Capped.sol";
 
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
-import {CurrencyLibrary, Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
-import {CurrencyLibrary, Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IPositionManager} from "@uniswap/v4-periphery/src/interfaces/IPositionManager.sol";
 import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
 import {FixedPointMathLib} from "@uniswap/v4-core/lib/solmate/src/utils/FixedPointMathLib.sol";
@@ -22,6 +20,8 @@ import {console} from "forge-std/console.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {LiquidityOperations} from "@uniswap/v4-periphery/test/shared/LiquidityOperations.sol";
 import {HookRevenues} from "./HookRevenues.sol";
+import {CurrencyLibrary, Currency} from "@uniswap/v4-core/src/types/Currency.sol";
+
 // BondingCurveToken contract
 // The base for launching memecoins
 // User can buy and sell tokens using a bonding curve
@@ -45,6 +45,7 @@ contract BondingCurveToken is ERC20Capped {
     uint256 public constant PRICE_SLOPE = 24e10;
     uint256 public constant PRECISION = 1 ether;
     int24 public constant TICK_SPACING = 60;
+    uint24 public constant FEE = 3000;
 
     // Mapping to keep track of NFTs owned by this contract
     mapping(address => uint256[]) public ownedNFTs;
@@ -52,7 +53,8 @@ contract BondingCurveToken is ERC20Capped {
     // Position Manager
     PoolModifyLiquidityTest public posm;
     IPoolManager public poolm;
-    IHooks constant hookContract = IHooks(address(0x0));
+    // IHooks constant hookContract = IHooks(address(0x0));
+    address public HOOK_ADDRESS;
 
     // Event to log received NFTs
     event NFTReceived(address operator, address from, uint256 tokenId, bytes data);
@@ -64,7 +66,7 @@ contract BondingCurveToken is ERC20Capped {
     error NotEnoughETHtoSellTokens();
     error NotEnoughETHtoProvideLiquidity();
 
-    constructor(address poolmAddress, address posmAddress)
+    constructor(address poolmAddress, address posmAddress, address hookAddress)
         ERC20Capped(TOTAL_SUPPLY)
         ERC20("Bonding Curve Token", "BCT")
     {
@@ -72,6 +74,8 @@ contract BondingCurveToken is ERC20Capped {
         // posm = IPositionManager(posmAddress);
         posm = PoolModifyLiquidityTest(posmAddress);
         poolm = IPoolManager(poolmAddress);
+        HOOK_ADDRESS = hookAddress;
+        // hook = HookRevenues(hookAddress);
     }
 
     function buy(uint256 amount) public payable {
@@ -129,9 +133,9 @@ contract BondingCurveToken is ERC20Capped {
         PoolKey memory pool = PoolKey({
             currency0: CurrencyLibrary.ADDRESS_ZERO,
             currency1: Currency.wrap((address(this))),
-            fee: 3000,
+            fee: FEE,
             tickSpacing: TICK_SPACING,
-            hooks: IHooks(address(0))
+            hooks: IHooks(HOOK_ADDRESS)
         });
 
         // Deploy pool from poolManager
@@ -145,22 +149,20 @@ contract BondingCurveToken is ERC20Capped {
     }
 
     function _addLiquidity(PoolKey memory pool) internal {
-
         console.log("ETH balance: %d", address(this).balance);
-        console.log("Token balance: %d", this.balanceOf(address(this)) );
+        console.log("Token balance: %d", this.balanceOf(address(this)));
         console.log("Price: %d", getPriceInv());
         bytes memory hookData = new bytes(0);
 
         uint160 pricePoolQ = uint160(FixedPointMathLib.sqrt(getPriceInv() * (2 ** 96)));
         console.log("Pool price SQRTX96: %d", pricePoolQ);
-        
 
         uint128 liquidityDelta = LiquidityAmounts.getLiquidityForAmounts(
             pricePoolQ,
             TickMath.getSqrtPriceAtTick(TickMath.MIN_TICK),
             TickMath.getSqrtPriceAtTick(TickMath.MAX_TICK),
             1e18,
-            this.balanceOf(address(this))// TO DO: this should be precisely equal to what we have minted
+            this.balanceOf(address(this)) // TO DO: this should be precisely equal to what we have minted
         );
 
         (uint256 amount0Check, uint256 amount1Check) = LiquidityAmounts.getAmountsForLiquidity(
@@ -182,17 +184,18 @@ contract BondingCurveToken is ERC20Capped {
         posm.modifyLiquidity{value: address(this).balance}(
             pool,
             IPoolManager.ModifyLiquidityParams(
-                TickMath.minUsableTick(TICK_SPACING), TickMath.maxUsableTick(TICK_SPACING), int256(uint256(liquidityDelta)), 0
+                TickMath.minUsableTick(TICK_SPACING),
+                TickMath.maxUsableTick(TICK_SPACING),
+                int256(uint256(liquidityDelta)),
+                0
             ),
             new bytes(0)
         );
-        
     }
 
     // add a fallback function to handle ETH
     receive() external payable {}
 
-   
     function _tokenApprovals() internal {
         // Currency0 is alaways ETH
         // if (!currency0.isAddressZero()) {
@@ -233,5 +236,4 @@ contract BondingCurveToken is ERC20Capped {
     function getMarketCap() public view returns (uint256) {
         return totalSupply() * getPrice();
     }
-
 }

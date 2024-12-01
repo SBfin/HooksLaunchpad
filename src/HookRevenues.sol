@@ -8,7 +8,7 @@ import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
-
+import {console} from "forge-std/console.sol";
 contract HookRevenues is BaseHook {
     // Hook to collect fees from the pool
     uint256 public constant HOOK_FEE = 100; // 1% fee (assuming WAD scale)
@@ -41,6 +41,7 @@ contract HookRevenues is BaseHook {
         BalanceDelta delta,
         bytes calldata // hookData
     ) external override returns (bytes4, int128) {
+        console.log("afterSwap");
         // fee will be in the unspecified token of the swap
         bool isCurrency0Specified = (params.amountSpecified < 0 == params.zeroForOne);
 
@@ -52,7 +53,8 @@ contract HookRevenues is BaseHook {
 
         uint256 feeAmount = mulWadDown(uint256(int256(amountUnspecified)), HOOK_FEE);
 
-        // mint ERC6909 as it's cheaper than ERC20 transfer
+        console.log("minting fee amount", feeAmount);
+        // mint ERC20 or transfer ETH to this contract
         poolManager.mint(address(this), CurrencyLibrary.toId(currencyUnspecified), feeAmount);
 
         return (BaseHook.afterSwap.selector, int128(int256(feeAmount)));
@@ -62,4 +64,7 @@ contract HookRevenues is BaseHook {
     function mulWadDown(uint256 x, uint256 y) internal pure returns (uint256) {
         return (x * y) / 1e18;
     }
+
+    // make this contract payable
+    receive() external payable {}
 }
