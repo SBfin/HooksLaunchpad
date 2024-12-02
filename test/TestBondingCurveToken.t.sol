@@ -53,7 +53,13 @@ contract TestBondingCurveToken is Test, Deployers {
 
         // Deploy bonding curve token
         console.log("Deploying BondingCurveToken");
-        bondingCurveToken = new BondingCurveToken(address(manager), address(modifyLiquidityRouter), address(hook), "MyToken", "MTK");
+        bondingCurveToken = new BondingCurveToken(
+            address(manager), 
+            address(modifyLiquidityRouter), 
+            address(hook), 
+            "MyToken", 
+            "MTK"
+        );
 
         vm.deal(address(this), 1e12 ether);
 
