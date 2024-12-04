@@ -31,8 +31,8 @@ contract TestBondingCurveFactory is Test, Deployers {
     function testCreateToken() public {
         vm.startPrank(USER);
 
-        // Create token
-        address payable tokenAddress = payable(factory.createToken("MyToken", "MTK"));
+        // Create token - fixed casting to payable address
+        address payable tokenAddress = payable(address(factory.createToken("MyToken", "MTK")));
         BondingCurveToken token = BondingCurveToken(tokenAddress);
 
         // Verify token creation

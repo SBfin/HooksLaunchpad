@@ -12,15 +12,6 @@ contract BondingCurveFactory {
     // State variables
     IPoolManager public immutable poolManager;
     address public immutable modifyLiquidityRouter;
-    
-    // Struct to store token and hook info
-    struct UserTokenInfo {
-        address tokenAddress;
-        address hookAddress;
-    }
-    
-    // Map user address to array of their token/hook pairs
-    mapping(address => UserTokenInfo[]) public userTokens;
 
     // Events
     event TokenCreated(address indexed creator, address tokenAddress, address hookAddress, string name, string symbol);
@@ -38,14 +29,17 @@ contract BondingCurveFactory {
      */
     function createToken(string memory name, string memory symbol) external returns (address token) {
         // Calculate hook flags
+        console.log("inside createToken");
         uint160 flags = uint160(Hooks.AFTER_SWAP_FLAG | Hooks.AFTER_SWAP_RETURNS_DELTA_FLAG);
         
         // Prepare constructor arguments for the hook
+        // should add also name and symbol in the constructorArgs of the hook miner
         bytes memory constructorArgs = abi.encode(poolManager);
         
         // Find hook address using HookMiner
+        console.log("inside HookMiner.find");
         (address hookAddress, bytes32 salt) = HookMiner.find(
-            address(this), // Use factory address instead of undefined CREATE2_DEPLOYER
+            address(this), // Correct checksummed address
             flags,
             type(HookRevenues).creationCode,
             constructorArgs
@@ -69,14 +63,9 @@ contract BondingCurveFactory {
             symbol
         );
 
-        // Update struct
-        userTokens[msg.sender].push(UserTokenInfo({
-            tokenAddress: address(newToken),
-            hookAddress: address(hook)
-        }));
-
         emit TokenCreated(msg.sender, address(newToken), address(hook), name, symbol);
 
         return address(newToken);
     }
+
 }
