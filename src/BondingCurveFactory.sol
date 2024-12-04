@@ -26,33 +26,17 @@ contract BondingCurveFactory {
      * @param name The name of the token
      * @param symbol The symbol of the token
      * @return token The address of the newly created token
-     */
-    function createToken(string memory name, string memory symbol) external returns (address token) {
-        // Calculate hook flags
-        console.log("inside createToken");
-        uint160 flags = uint160(Hooks.AFTER_SWAP_FLAG | Hooks.AFTER_SWAP_RETURNS_DELTA_FLAG);
-        
-        // Prepare constructor arguments for the hook
-        // should add also name and symbol in the constructorArgs of the hook miner
-        bytes memory constructorArgs = abi.encode(poolManager);
-        
-        // Find hook address using HookMiner
-        console.log("inside HookMiner.find");
-        (address hookAddress, bytes32 salt) = HookMiner.find(
-            address(this), // Correct checksummed address
-            flags,
-            type(HookRevenues).creationCode,
-            constructorArgs
-        );
-
-        console.log("Hook address:", hookAddress);
-
-        // Deploy hook
+     **/
+    function createToken(
+        string memory name, 
+        string memory symbol,
+        address precomputedHookAddress,
+        bytes32 salt
+    ) external returns (address token) {
+        // Use precomputed values instead of calculating on-chain
         HookRevenues hook = new HookRevenues{salt: salt}(IPoolManager(poolManager));
-
-        console.log("Hook address:", address(hook));
-        require(address(hook) == hookAddress, "Hook deployment failed");
-
+        
+        require(address(hook) == precomputedHookAddress, "Hook deployment failed");
 
         // Deploy token
         BondingCurveToken newToken = new BondingCurveToken{salt: keccak256(abi.encode(name, symbol))}(
