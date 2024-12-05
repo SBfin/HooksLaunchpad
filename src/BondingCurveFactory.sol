@@ -12,13 +12,25 @@ contract BondingCurveFactory {
     // State variables
     IPoolManager public immutable poolManager;
     address public immutable modifyLiquidityRouter;
+    address public immutable hookAddress;
+    bytes32 public immutable salt;
+    HookRevenues public immutable hook;
 
     // Events
     event TokenCreated(address indexed creator, address tokenAddress, address hookAddress, string name, string symbol);
 
-    constructor(address _poolManager, address _modifyLiquidityRouter) {
+    constructor(
+        address _poolManager, 
+        address _modifyLiquidityRouter, 
+        address payable _hookAddress,
+        bytes32 _salt
+    ) {
         poolManager = IPoolManager(_poolManager);
         modifyLiquidityRouter = _modifyLiquidityRouter;
+        hookAddress = _hookAddress;
+        salt = _salt;
+        
+        hook = HookRevenues(_hookAddress);
     }
 
     /**
@@ -29,25 +41,22 @@ contract BondingCurveFactory {
      **/
     function createToken(
         string memory name, 
-        string memory symbol,
-        address precomputedHookAddress,
-        bytes32 salt
+        string memory symbol
     ) external returns (address token) {
-        // Use precomputed values instead of calculating on-chain
-        HookRevenues hook = new HookRevenues{salt: salt}(IPoolManager(poolManager));
-        
-        require(address(hook) == precomputedHookAddress, "Hook deployment failed");
-
+        // Use precomputed values instead of calculating on-chain        
         // Deploy token
+        console.log('deployment');
         BondingCurveToken newToken = new BondingCurveToken{salt: keccak256(abi.encode(name, symbol))}(
             address(poolManager),
             address(modifyLiquidityRouter),
-            address(hook),
+            address(hookAddress),
             name,
             symbol
         );
 
-        emit TokenCreated(msg.sender, address(newToken), address(hook), name, symbol);
+        console.log('newToken', address(newToken));
+
+        emit TokenCreated(msg.sender, address(newToken), hookAddress, name, symbol);
 
         return address(newToken);
     }

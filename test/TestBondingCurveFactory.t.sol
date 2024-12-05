@@ -25,12 +25,6 @@ contract TestBondingCurveFactory is Test, Deployers {
         // Deploy Uniswap v4 contracts
         deployFreshManagerAndRouters();
 
-        // Deploy factory
-        factory = new BondingCurveFactory(
-            address(manager),
-            address(modifyLiquidityRouter)
-        );
-
         // generated with hook miner, cannot run it in the factory as goes out of gas
         uint160 flags = uint160(
             Hooks.AFTER_SWAP_FLAG | Hooks.AFTER_SWAP_RETURNS_DELTA_FLAG
@@ -38,8 +32,18 @@ contract TestBondingCurveFactory is Test, Deployers {
 
         bytes memory constructorArgs = abi.encode(address(manager));
 
-        (hookAddress, salt) = HookMiner.find(address(factory), flags, type(HookRevenues).creationCode, constructorArgs);
+        (hookAddress, salt) = HookMiner.find(0x4e59b44847b379578588920cA78FbF26c0B4956C, flags, type(HookRevenues).creationCode, constructorArgs);
 
+        console.log("Hook address:", hookAddress);
+
+        // Deploy factory
+        factory = new BondingCurveFactory(
+            address(manager),
+            address(modifyLiquidityRouter),
+            payable(hookAddress),
+            salt
+        );
+        
         // Fund test user
         vm.deal(USER, 100 ether);
     }
@@ -48,7 +52,7 @@ contract TestBondingCurveFactory is Test, Deployers {
         vm.startPrank(USER);
 
         // Create token
-        address payable tokenAddress = payable(factory.createToken("MyToken", "MTK", hookAddress, salt));
+        address payable tokenAddress = payable(factory.createToken("MyToken", "MTK"));
 
         BondingCurveToken token = BondingCurveToken(tokenAddress);
 
