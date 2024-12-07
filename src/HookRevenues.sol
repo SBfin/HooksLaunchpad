@@ -9,8 +9,9 @@ import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {console} from "forge-std/console.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract HookRevenues is BaseHook {
+contract HookRevenues is BaseHook, Ownable {
     // Hook to collect fees from the pool
     uint256 public constant HOOK_FEE = 1e16; // 1% fee (assuming WAD scale)
 
@@ -72,4 +73,25 @@ contract HookRevenues is BaseHook {
 
     // make this contract payable
     receive() external payable {}
+
+    // ADAPTERS Callable by ai agent owner
+    // swap on uniswap v4
+    function swap(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOutMin, address to) external {
+        poolManager.swap(tokenIn, tokenOut, amountIn, amountOutMin, to);
+    }
+
+    // add liquidity to uniswap v4
+    function addLiquidity(address token0, address token1, uint256 amount0, uint256 amount1) external {
+        poolManager.addLiquidity(token0, token1, amount0, amount1);
+    }
+
+    // remove liquidity from uniswap v4
+    function removeLiquidity(address token0, address token1, uint256 liquidity) external {
+        poolManager.removeLiquidity(token0, token1, liquidity);
+    }
+
+    // Aave v3
+    function deposit(address token, uint256 amount) external {
+        aaveV3Pool.deposit(token, amount, address(this), 0);
+    }
 }
